@@ -15,7 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
-  secure: false, // true для 465, false для других портов
+  secure: false,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -42,7 +42,7 @@ app.post('/new-employee', async (req, res) => {
   const groupId = role === 'design' ? process.env.GROUP_DESIGN_ID : process.env.GROUP_DEV_ID;
   const roleName = role === 'design' ? 'Дизайн-группа' : 'Группа разработки';
 
-  console.log(`Выбрана роль: ${roleName}, ID группы: ${groupId}`);
+  console.log(`Выбрана роль: ${roleName}`);
 
   try {
     // 1. Проверить/создать пользователя в Kaiten
@@ -67,21 +67,8 @@ app.post('/new-employee', async (req, res) => {
       console.log(`Создан пользователь с ID: ${userId}`);
     }
 
-    // 2. Добавить в группу — через PATCH /users/{id}
-    console.log(`Шаг 2: Добавление в группу ${groupId}...`);
-    await axios.patch(
-      `https://panna.kaiten.ru/api/latest/users/${userId}`,
-      {
-        groups: [parseInt(groupId)]
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    console.log('Успешно добавлен в группу');
+    // ⚠️ Шаг 2: Пропускаем добавление в группу — делаем вручную
+    console.log('Шаг 2: Пропускаем добавление в группу — выполняется вручную через интерфейс Kaiten');
 
     // 3. Создать карточку в Kaiten
     console.log('Шаг 3: Создание карточки сотрудника...');
@@ -107,7 +94,7 @@ app.post('/new-employee', async (req, res) => {
 `;
     }
 
-    // Шаблон описания для IT
+    // Шаблон описания для IT — с напоминанием про группу
     const descriptionTemplate = role === 'design' ? `
 Запрос на создание доступов для нового сотрудника:
 
@@ -127,6 +114,11 @@ Email: ${email}
 - Присвоить внутренний номер телефона в Спарке
 - Добавить в рассылки: art@panna.ru, panna-r@panna.ru или db_design@panna.ru
 ${additionalCardsText}
+
+---
+⚠️ ВАЖНО: Добавьте сотрудника в группу Kaiten вручную:
+- Группа: Дизайн-группа
+- Ссылка: https://panna.kaiten.ru/admin/users
 ` : `
 Запрос на создание доступов для нового сотрудника:
 
@@ -144,6 +136,11 @@ Email: ${email}
 - Роль в ТИС: Дизайнер ПАННА
 - Присвоить внутренний номер телефона в Спарке
 - Добавить в рассылки: art@panna.ru, db_managers@panna.ru, zamena@panna.ru, freya_crystal@panna.ru и др.
+
+---
+⚠️ ВАЖНО: Добавьте сотрудника в группу Kaiten вручную:
+- Группа: Группа разработки
+- Ссылка: https://panna.kaiten.ru/admin/users
 `;
 
     const cardData = {
@@ -162,31 +159,26 @@ Email: ${email}
     const cardId = createCardRes.data.id;
     console.log(`Карточка создана, ID: ${cardId}`);
 
-    // 4. Создать чек-лист в карточке
-    // 4. Создать чек-лист в карточке
-console.log('Шаг 4: Создание чек-листа...');
-for (const item of checklistItems) {
-  try {
-    await axios.post(
-      `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists`,
-      {
-        name: item,
-        is_checked: false,
-        sort_order: 0
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}`,
-          'Content-Type': 'application/json'
+    // 4. Создать чек-лист в карточке — ИСПРАВЛЕНО: name вместо title
+    console.log('Шаг 4: Создание чек-листа...');
+    for (const item of checklistItems) {
+      await axios.post(
+        `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists`,
+        {
+          name: item,
+          is_checked: false,
+          sort_order: 0
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
         }
-      }
-    );
-    console.log(`Добавлен пункт: "${item}"`);
-  } catch (error) {
-    console.error(`Ошибка при добавлении пункта "${item}":`, error.message);
-  }
-}
-console.log('Чек-лист успешно создан');
+      );
+      console.log(`Добавлен пункт: "${item}"`);
+    }
+    console.log('Чек-лист успешно создан');
 
     // 5. Отправить приветственное письмо
     console.log('Шаг 5: Отправка приветственного письма...');
