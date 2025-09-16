@@ -2,10 +2,12 @@ document.getElementById('employeeForm').addEventListener('submit', async (e) => 
   e.preventDefault();
 
   const formData = {
-    email: document.getElementById('email').value,
-    fullName: document.getElementById('fullName').value,
-    role: document.getElementById('role').value === 'Дизайн-группа' ? 'design' : 'dev'
+    email: document.getElementById('email').value.trim(),
+    fullName: document.getElementById('fullName').value.trim(),
+    role: document.getElementById('role').value // ✅ Было: === 'Дизайн-группа' ? 'design' : 'dev' — это было ошибкой!
   };
+
+  console.log('Отправка данных:', formData);
 
   const resultDiv = document.getElementById('result');
   resultDiv.innerHTML = '<p>Обработка...</p>';
