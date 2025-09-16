@@ -5,7 +5,7 @@ const nodemailer = require('nodemailer');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000; // Render по умолчанию использует 10000
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -15,7 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
-  secure: false,
+  secure: false, // true для 465, false для других портов (например, 587)
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -67,10 +67,10 @@ app.post('/new-employee', async (req, res) => {
       console.log(`Создан пользователь с ID: ${userId}`);
     }
 
-    // ⚠️ Шаг 2: Пропускаем добавление в группу — делаем вручную
+    // 2. Пропускаем добавление в группу — делаем вручную
     console.log('Шаг 2: Пропускаем добавление в группу — выполняется вручную через интерфейс Kaiten');
 
-    // 3. Создать карточку в Kaiten
+    // 3. Создать карточку в Kaiten — с board_id и column_id
     console.log('Шаг 3: Создание карточки сотрудника...');
     const cardTitle = `Онбординг: ${fullName}`;
     const checklistItems = [
@@ -132,7 +132,7 @@ Email: ${email}
   - \\\\gamma\\public\\images-design\\Illustrations (создание своей папки)
   - \\\\gamma.local\\public\\Vinogradovo\\Workspace\\Фото наборов (редактирование)
   - G:\\Proizvodstvo\\ДИЗАЙН БЮРО (редактирование)
-  - G:\\Proizvodstvo\\ПРОЕКТЫ\\CОТВОРЕЛЬ+СОТВОРЕЛКИ и др. проекты (в зависимости от направления)
+  - G:\\Proизводство\\ПРОЕКТЫ\\CОТВОРЕЛЬ+СОТВОРЕЛКИ и др. проекты (в зависимости от направления)
 - Роль в ТИС: Дизайнер ПАННА
 - Присвоить внутренний номер телефона в Спарке
 - Добавить в рассылки: art@panna.ru, db_managers@panna.ru, zamena@panna.ru, freya_crystal@panna.ru и др.
@@ -143,21 +143,27 @@ Email: ${email}
 - Ссылка: https://panna.kaiten.ru/admin/users
 `;
 
+    // Обязательно: board_id и column_id
     const cardData = {
       title: cardTitle,
       description: descriptionTemplate,
-      space_id: process.env.KAITEN_SPACE_ID,
-      board_id: process.env.KAITEN_BOARD_ID,
+      board_id: parseInt(process.env.KAITEN_BOARD_ID),    // 1434550
+      column_id: parseInt(process.env.KAITEN_COLUMN_ID)   // 4981617
     };
 
     const createCardRes = await axios.post(
-      `https://panna.kaiten.ru/api/latest/spaces/${process.env.KAITEN_SPACE_ID}/boards/${process.env.KAITEN_BOARD_ID}/cards`,
+      `https://panna.kaiten.ru/api/latest/cards`,
       cardData,
-      { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      }
     );
 
     const cardId = createCardRes.data.id;
-    console.log(`Карточка создана, ID: ${cardId}`);
+    console.log(`✅ Карточка успешно создана, ID: ${cardId}`);
 
     // 4. Создать чек-лист в карточке — ИСПРАВЛЕНО: name вместо title
     console.log('Шаг 4: Создание чек-листа...');
@@ -165,7 +171,7 @@ Email: ${email}
       await axios.post(
         `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists`,
         {
-          name: item,
+          name: item,           // ✅ Kaiten требует "name", а не "title"
           is_checked: false,
           sort_order: 0
         },
@@ -239,6 +245,6 @@ Email: ${email}
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => { // Render требует 0.0.0.0
   console.log(`🚀 Сервер запущен на порту ${PORT}`);
 });
