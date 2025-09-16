@@ -133,10 +133,10 @@ Email: ${email}
     };
 
     const createCardRes = await axios.post(
-      'https://panna.kaiten.ru/api/latest/cards',
-      cardData,
-      { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
-    );
+  `https://panna.kaiten.ru/api/latest/spaces/${process.env.KAITEN_SPACE_ID}/boards/${process.env.KAITEN_BOARD_ID}/cards`,
+  cardData,
+  { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
+);
 
     const cardId = createCardRes.data.id;
 
