@@ -46,8 +46,9 @@ app.post('/new-employee', async (req, res) => {
 
   try {
     // 1. Проверить/создать пользователя в Kaiten
-    console.log('Шаг 1: Проверка пользователя в Kaiten...');
+    console.log('Шаг 1: Поиск пользователя по email...');
     let userId;
+
     const checkUserRes = await axios.get(`https://panna.kaiten.ru/api/latest/users?email=${email}`, {
       headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` },
     });
@@ -66,12 +67,19 @@ app.post('/new-employee', async (req, res) => {
       console.log(`Создан пользователь с ID: ${userId}`);
     }
 
-    // 2. Добавить в группу
+    // 2. Добавить в группу — через PATCH /users/{id}
     console.log(`Шаг 2: Добавление в группу ${groupId}...`);
-    await axios.post(
-      `https://panna.kaiten.ru/api/latest/user-groups/${groupId}/members`,
-      { user_id: userId },
-      { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
+    await axios.patch(
+      `https://panna.kaiten.ru/api/latest/users/${userId}`,
+      {
+        groups: [parseInt(groupId)]
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      }
     );
     console.log('Успешно добавлен в группу');
 
