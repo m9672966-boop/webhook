@@ -163,16 +163,30 @@ Email: ${email}
     console.log(`Карточка создана, ID: ${cardId}`);
 
     // 4. Создать чек-лист в карточке
-    console.log('Шаг 4: Создание чек-листа...');
-    for (const item of checklistItems) {
-      await axios.post(
-        `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists`,
-        { title: item, is_checked: false },
-        { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
-      );
-      console.log(`Добавлен пункт: "${item}"`);
-    }
-    console.log('Чек-лист успешно создан');
+    // 4. Создать чек-лист в карточке
+console.log('Шаг 4: Создание чек-листа...');
+for (const item of checklistItems) {
+  try {
+    await axios.post(
+      `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists`,
+      {
+        name: item,
+        is_checked: false,
+        sort_order: 0
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    console.log(`Добавлен пункт: "${item}"`);
+  } catch (error) {
+    console.error(`Ошибка при добавлении пункта "${item}":`, error.message);
+  }
+}
+console.log('Чек-лист успешно создан');
 
     // 5. Отправить приветственное письмо
     console.log('Шаг 5: Отправка приветственного письма...');
