@@ -31,15 +31,22 @@ app.get('/', (req, res) => {
 app.post('/new-employee', async (req, res) => {
   const { email, fullName, role } = req.body;
 
+  console.log('=== Начало обработки запроса ===');
+  console.log('Полученные данные:', { email, fullName, role });
+
   if (!email || !fullName || !role) {
+    console.log('Ошибка: не заполнены обязательные поля');
     return res.status(400).json({ error: 'Все поля обязательны' });
   }
 
   const groupId = role === 'design' ? process.env.GROUP_DESIGN_ID : process.env.GROUP_DEV_ID;
   const roleName = role === 'design' ? 'Дизайн-группа' : 'Группа разработки';
 
+  console.log(`Выбрана роль: ${roleName}, ID группы: ${groupId}`);
+
   try {
     // 1. Проверить/создать пользователя в Kaiten
+    console.log('Шаг 1: Проверка пользователя в Kaiten...');
     let userId;
     const checkUserRes = await axios.get(`https://panna.kaiten.ru/api/latest/users?email=${email}`, {
       headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` },
@@ -47,23 +54,29 @@ app.post('/new-employee', async (req, res) => {
 
     if (checkUserRes.data.length > 0) {
       userId = checkUserRes.data[0].id;
+      console.log(`Пользователь найден, ID: ${userId}`);
     } else {
+      console.log('Пользователь не найден, создаём нового...');
       const createUserRes = await axios.post(
         'https://panna.kaiten.ru/api/latest/users',
         { email, full_name: fullName },
         { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
       );
       userId = createUserRes.data.id;
+      console.log(`Создан пользователь с ID: ${userId}`);
     }
 
     // 2. Добавить в группу
+    console.log(`Шаг 2: Добавление в группу ${groupId}...`);
     await axios.post(
       `https://panna.kaiten.ru/api/latest/user-groups/${groupId}/members`,
       { user_id: userId },
       { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
     );
+    console.log('Успешно добавлен в группу');
 
     // 3. Создать карточку в Kaiten
+    console.log('Шаг 3: Создание карточки сотрудника...');
     const cardTitle = `Онбординг: ${fullName}`;
     const checklistItems = [
       "Запросить доступ к папкам (список по роли)",
@@ -133,23 +146,28 @@ Email: ${email}
     };
 
     const createCardRes = await axios.post(
-  `https://panna.kaiten.ru/api/latest/spaces/${process.env.KAITEN_SPACE_ID}/boards/${process.env.KAITEN_BOARD_ID}/cards`,
-  cardData,
-  { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
-);
+      `https://panna.kaiten.ru/api/latest/spaces/${process.env.KAITEN_SPACE_ID}/boards/${process.env.KAITEN_BOARD_ID}/cards`,
+      cardData,
+      { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
+    );
 
     const cardId = createCardRes.data.id;
+    console.log(`Карточка создана, ID: ${cardId}`);
 
     // 4. Создать чек-лист в карточке
+    console.log('Шаг 4: Создание чек-листа...');
     for (const item of checklistItems) {
       await axios.post(
         `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists`,
         { title: item, is_checked: false },
         { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
       );
+      console.log(`Добавлен пункт: "${item}"`);
     }
+    console.log('Чек-лист успешно создан');
 
     // 5. Отправить приветственное письмо
+    console.log('Шаг 5: Отправка приветственного письма...');
     const mailTemplate = role === 'design' ? `
 Привет, ${fullName}!
 
@@ -192,15 +210,21 @@ Email: ${email}
       subject: `Добро пожаловать в Panna, ${fullName}!`,
       text: mailTemplate,
     });
+    console.log('Письмо успешно отправлено');
 
     res.json({ success: true, message: `Сотрудник ${fullName} успешно добавлен!` });
+    console.log('=== Обработка завершена успешно ===');
 
   } catch (error) {
-    console.error('Ошибка:', error.message);
+    console.error('❌ КРИТИЧЕСКАЯ ОШИБКА:', error.message);
+    if (error.response) {
+      console.error('Статус ответа:', error.response.status);
+      console.error('Данные ошибки:', error.response.data);
+    }
     res.status(500).json({ error: 'Ошибка при добавлении сотрудника', details: error.message });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`Сервер запущен на порту ${PORT}`);
+  console.log(`🚀 Сервер запущен на порту ${PORT}`);
 });
