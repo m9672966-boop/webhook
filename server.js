@@ -5,7 +5,7 @@ const nodemailer = require('nodemailer');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 10000; // Render по умолчанию использует 10000
+const PORT = process.env.PORT || 10000;
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -15,7 +15,7 @@ app.use(express.urlencoded({ extended: true }));
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
-  secure: false, // true для 465, false для других портов (например, 587)
+  secure: false,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -39,9 +39,7 @@ app.post('/new-employee', async (req, res) => {
     return res.status(400).json({ error: 'Все поля обязательны' });
   }
 
-  const groupId = role === 'design' ? process.env.GROUP_DESIGN_ID : process.env.GROUP_DEV_ID;
   const roleName = role === 'design' ? 'Дизайн-группа' : 'Группа разработки';
-
   console.log(`Выбрана роль: ${roleName}`);
 
   try {
@@ -73,26 +71,6 @@ app.post('/new-employee', async (req, res) => {
     // 3. Создать карточку в Kaiten — с board_id и column_id
     console.log('Шаг 3: Создание карточки сотрудника...');
     const cardTitle = `Онбординг: ${fullName}`;
-    const checklistItems = [
-      "Запросить доступ к папкам (список по роли)",
-      "Назначить телефон в Спарке",
-      "Добавить в рассылки (список по роли)",
-      "Пригласить в Kaiten + добавить в группу",
-      "Дать заполнить заявление на ЗП",
-      "Напомнить про карточку правок времени на 2-й день"
-    ];
-
-    // Дополнительные карточки только для дизайн-группы
-    let additionalCardsText = '';
-    if (role === 'design') {
-      additionalCardsText = `
-Дополнительно добавить в карточки с общей инфой:
-- https://panna.kaiten.ru/32382746
-- https://panna.kaiten.ru/32146386
-- https://panna.kaiten.ru/32146660
-- https://panna.kaiten.ru/32500879
-`;
-    }
 
     // Шаблон описания для IT — с напоминанием про группу
     const descriptionTemplate = role === 'design' ? `
@@ -113,7 +91,6 @@ Email: ${email}
 - Роль в ТИС: Менеджер по рекламе
 - Присвоить внутренний номер телефона в Спарке
 - Добавить в рассылки: art@panna.ru, panna-r@panna.ru или db_design@panna.ru
-${additionalCardsText}
 
 ---
 ⚠️ ВАЖНО: Добавьте сотрудника в группу Kaiten вручную:
@@ -147,8 +124,8 @@ Email: ${email}
     const cardData = {
       title: cardTitle,
       description: descriptionTemplate,
-      board_id: parseInt(process.env.KAITEN_BOARD_ID),    // 1434550
-      column_id: parseInt(process.env.KAITEN_COLUMN_ID)   // 4981617
+      board_id: parseInt(process.env.KAITEN_BOARD_ID),
+      column_id: parseInt(process.env.KAITEN_COLUMN_ID)
     };
 
     const createCardRes = await axios.post(
@@ -165,44 +142,44 @@ Email: ${email}
     const cardId = createCardRes.data.id;
     console.log(`✅ Карточка успешно создана, ID: ${cardId}`);
 
-    // 4. Создать чек-лист и добавить пункты
-console.log('Шаг 4: Создание чек-листа и добавление пунктов...');
-const checklistName = "Онбординг";
-const checklistItems = [
-  "Запросить доступ к папкам",
-  "Назначить телефон в Спарке",
-  "Добавить в рассылки",
-  "Пригласить в Kaiten",
-  "Дать заполнить заявление на ЗП",
-  "Напомнить про карточку правок времени"
-];
+    // 4. Создать ОДИН чек-лист и добавить в него пункты
+    console.log('Шаг 4: Создание чек-листа и добавление пунктов...');
+    const checklistName = "Онбординг";
+    const checklistItems = [
+      "Запросить доступ к папкам (список по роли)",
+      "Назначить телефон в Спарке",
+      "Добавить в рассылки (список по роли)",
+      "Пригласить в Kaiten + добавить в группу",
+      "Дать заполнить заявление на ЗП",
+      "Напомнить про карточку правок времени на 2-й день"
+    ];
 
-// Создаем один чек-лист
-const createChecklistRes = await axios.post(
-  `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists`,
-  {
-    name: checklistName,
-    sort_order: 1
-  },
-  { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
-);
+    // Создаем один чек-лист
+    const createChecklistRes = await axios.post(
+      `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists`,
+      {
+        name: checklistName,
+        sort_order: 1
+      },
+      { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
+    );
 
-const checklistId = createChecklistRes.data.id;
-console.log(`✅ Чек-лист создан, ID: ${checklistId}`);
+    const checklistId = createChecklistRes.data.id;
+    console.log(`✅ Чек-лист создан, ID: ${checklistId}`);
 
-// Добавляем пункты в этот чек-лист
-for (const item of checklistItems) {
-  await axios.post(
-    `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists/${checklistId}/items`,
-    {
-      text: item,
-      sort_order: 1
-    },
-    { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
-  );
-  console.log(`✅ Добавлен пункт: "${item}"`);
-}
-console.log('Чек-лист успешно создан');
+    // Добавляем пункты в этот чек-лист
+    for (const item of checklistItems) {
+      await axios.post(
+        `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists/${checklistId}/items`,
+        {
+          text: item,
+          sort_order: 1
+        },
+        { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
+      );
+      console.log(`✅ Добавлен пункт: "${item}"`);
+    }
+    console.log('Чек-лист успешно создан');
 
     // 5. Отправить приветственное письмо
     console.log('Шаг 5: Отправка приветственного письма...');
@@ -263,6 +240,6 @@ console.log('Чек-лист успешно создан');
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => { // Render требует 0.0.0.0
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Сервер запущен на порту ${PORT}`);
 });
