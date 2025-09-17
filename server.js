@@ -142,44 +142,47 @@ Email: ${email}
     const cardId = createCardRes.data.id;
     console.log(`✅ Карточка успешно создана, ID: ${cardId}`);
 
-    // 4. Создать ОДИН чек-лист и добавить в него пункты
-    console.log('Шаг 4: Создание чек-листа и добавление пунктов...');
-    const checklistName = "Онбординг";
-    const checklistItems = [
-      "Запросить доступ к папкам (список по роли)",
-      "Назначить телефон в Спарке",
-      "Добавить в рассылки (список по роли)",
-      "Пригласить в Kaiten + добавить в группу",
-      "Дать заполнить заявление на ЗП",
-      "Напомнить про карточку правок времени на 2-й день"
-    ];
+   // 4. Создать чек-лист и добавить пункты
+console.log('Шаг 4: Создание чек-листа и добавление пунктов...');
+const checklistName = "Онбординг";
+const checklistItems = [
+  "Запросить доступ к папкам (список по роли)",
+  "Назначить телефон в Спарке",
+  "Добавить в рассылки (список по роли)",
+  "Пригласить в Kaiten + добавить в группу",
+  "Дать заполнить заявление на ЗП",
+  "Напомнить про карточку правок времени на 2-й день"
+];
 
-    // Создаем один чек-лист
-    const createChecklistRes = await axios.post(
-      `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists`,
-      {
-        name: checklistName,
-        sort_order: 1
-      },
-      { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
-    );
+// Создаем один чек-лист
+const createChecklistRes = await axios.post(
+  `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists`,
+  {
+    name: checklistName,
+    sort_order: 1
+  },
+  { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
+);
 
-    const checklistId = createChecklistRes.data.id;
-    console.log(`✅ Чек-лист создан, ID: ${checklistId}`);
+const checklistId = createChecklistRes.data.id;
+console.log(`✅ Чек-лист создан, ID: ${checklistId}`);
 
-    // Добавляем пункты в этот чек-лист
-    for (const item of checklistItems) {
-      await axios.post(
-        `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists/${checklistId}/items`,
-        {
-          text: item,
-          sort_order: 1
-        },
-        { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
-      );
-      console.log(`✅ Добавлен пункт: "${item}"`);
-    }
-    console.log('Чек-лист успешно создан');
+// Добавляем пункты с задержкой
+for (const item of checklistItems) {
+  await axios.post(
+    `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists/${checklistId}/items`,
+    {
+      text: item,
+      sort_order: 1
+    },
+    { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
+  );
+  console.log(`✅ Добавлен пункт: "${item}"`);
+
+  // Задержка 500 мс
+  await new Promise(resolve => setTimeout(resolve, 500));
+}
+console.log('Чек-лист успешно создан');
 
     // 5. Отправить приветственное письмо
     console.log('Шаг 5: Отправка приветственного письма...');
