@@ -165,25 +165,42 @@ Email: ${email}
     const cardId = createCardRes.data.id;
     console.log(`✅ Карточка успешно создана, ID: ${cardId}`);
 
-    // 4. Создать чек-лист в карточке — ИСПРАВЛЕНО: name вместо title
-    // 4. Создать чек-лист в карточке
-console.log('Шаг 4: Создание чек-листа...');
+    // 4. Создать чек-лист и добавить пункты
+console.log('Шаг 4: Создание чек-листа и добавление пунктов...');
+const checklistName = "Онбординг";
+const checklistItems = [
+  "Запросить доступ к папкам",
+  "Назначить телефон в Спарке",
+  "Добавить в рассылки",
+  "Пригласить в Kaiten",
+  "Дать заполнить заявление на ЗП",
+  "Напомнить про карточку правок времени"
+];
+
+// Создаем один чек-лист
+const createChecklistRes = await axios.post(
+  `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists`,
+  {
+    name: checklistName,
+    sort_order: 1
+  },
+  { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
+);
+
+const checklistId = createChecklistRes.data.id;
+console.log(`✅ Чек-лист создан, ID: ${checklistId}`);
+
+// Добавляем пункты в этот чек-лист
 for (const item of checklistItems) {
   await axios.post(
-    `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists`,
+    `https://panna.kaiten.ru/api/latest/cards/${cardId}/checklists/${checklistId}/items`,
     {
-      name: item,
-      is_checked: false,
-      sort_order: 1  // ← ИСПРАВЛЕНО: 1 вместо 0
+      text: item,
+      sort_order: 1
     },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}`,
-        'Content-Type': 'application/json'
-      }
-    }
+    { headers: { Authorization: `Bearer ${process.env.KAITEN_API_TOKEN}` } }
   );
-  console.log(`Добавлен пункт: "${item}"`);
+  console.log(`✅ Добавлен пункт: "${item}"`);
 }
 console.log('Чек-лист успешно создан');
 
