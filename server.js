@@ -10,13 +10,32 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 
-// Основной маршрут
-app.get('/', (req, res) => {
+// Middleware для базовой аутентификации
+const requireAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Basic ')) {
+    return res.status(401).set('WWW-Authenticate', 'Basic realm="Restricted Area"').send('Требуется авторизация');
+  }
+
+  const base64Credentials = authHeader.split(' ')[1];
+  const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
+  const [username, password] = credentials.split(':');
+
+  if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
+    next();
+  } else {
+    return res.status(401).set('WWW-Authenticate', 'Basic realm="Restricted Area"').send('Неверный логин или пароль');
+  }
+};
+
+// Основной маршрут — защищён авторизацией
+app.get('/', requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// API: добавление сотрудника
-app.post('/new-employee', async (req, res) => {
+// API: добавление сотрудника — защищён авторизацией
+app.post('/new-employee', requireAuth, async (req, res) => {
   const { email, fullName, role } = req.body;
 
   console.log('=== Начало обработки запроса ===');
@@ -77,14 +96,13 @@ app.post('/new-employee', async (req, res) => {
       console.log('✅ Успешно добавлен в группу');
     } catch (error) {
       console.warn('⚠️ Не удалось добавить в группу через API:', error.message);
-      console.warn('ℹ️ Добавьте сотрудника в группу вручную через интерфейс Kaiten.');
     }
 
     // 3. Создать карточку в Kaiten — с board_id и column_id
     console.log('Шаг 3: Создание карточки сотрудника...');
     const cardTitle = `Онбординг: ${fullName}`;
 
-    // Шаблон описания для IT — с напоминанием про группу
+    // Полный шаблон описания для IT — без напоминаний про группу
     const descriptionTemplate = role === 'design' ? `
 Запрос на создание доступов для нового сотрудника:
 
@@ -95,19 +113,44 @@ Email: ${email}
 Требуется:
 - Доступ к интернету с соцсетями
 - Права на папки:
-  - \\\\gamma\\public\\images-design\\Illustrations (создание)
+  - \\\\gamma\\public\\images-design\\Illustrations (создание своей рабочей папки)
   - \\\\gamma.local\\public\\Vinogradovo\\Design-Vinogradovo (чтение/редактирование)
   - \\\\fs-v-2.gamma.local\\images (чтение/редактирование)
+  - \\\\gamma.local\\public\\Images (чтение/редактирование)
+  - \\\\gamma.local\\public\\Layouts (чтение/редактирование)
+  - \\\\gamma.local\\public\\Vinogradovo\\Workspace\\TOOLS (чтение/редактирование)
+  - \\\\gamma.local\\public\\Vinogradovo\\Workspace\\РЕКЛАМНЫЕ МАКЕТЫ (чтение/редактирование)
+  - \\\\gamma.local\\public\\Vinogradovo\\Workspace\\Фото наборов (чтение/редактирование)
+  - \\\\gamma.local\\public\\Vinogradovo\\Workspace (чтение/редактирование)
+  - “Шаблоны полиграфии”, “Контент и бланк комментариев”, “Разработка товара” (чтение/редактирование)
   - G:\\Proizvodstvo\\ДИЗАЙН БЮРО (чтение/редактирование)
-  - ... и другие по списку из ТЗ
+  - \\\\gamma.local\\public\\Vinogradovo\\Workspace\\0_В ПЕЧАТЬ (чтение/редактирование)
+  - G:\\Proizvodstvo\\БУМБЕЛ\\ДИЗАЙН (чтение/редактирование)
+  - G:\\Proizvodstvo\\КАНЦЕЛЯРИЯ\\КАРАНДАШНА ФАБРИКА\\ВКФ_МАКЕТЫ (чтение/редактирование)
+  - G:\\Proizvodstvo\\КАНЦЕЛЯРИЯ\\КАРАНДАШНА ФАБРИКА\\ВКФ_ОРИГИНАЛЫ В ПЕЧАТЬ (чтение/редактирование)
+- На чтение:
+  - \\\\gamma.local\\public\\Vinogradovo\\Workspace\\ПЕРЕВОД
+  - G:\\Proizvodstvo\\Общая
+  - \\\\gamma.local\\public\\Image_Bank\\
+  - G:\\Proizvodstvo\\БУМБЕЛ\\ФОТО, КОНТЕНТ
+  - \\\\gamma\\archive\\reklama\\Изображения_товаров
+
 - Роль в ТИС: Менеджер по рекламе
 - Присвоить внутренний номер телефона в Спарке
-- Добавить в рассылки: art@panna.ru, panna-r@panna.ru или db_design@panna.ru
+- Пригласить в Kaiten и добавить в группу "Дизайн-группа"
+- Добавить в рассылки:
+  - art@panna.ru — рассылка всего ДБ
+  - panna-r@panna.ru — рассылка верстки
+  - или db_design@panna.ru — рассылка дизайнеры
+- Дать заполнить заявление на ЗП
+- Добавить в карточки с общей информацией:
+  - https://panna.kaiten.ru/32382746
+  - https://panna.kaiten.ru/32146386
+  - https://panna.kaiten.ru/32146660
+  - https://panna.kaiten.ru/32500879
 
 ---
-⚠️ ВАЖНО: Если автоматическое добавление в группу не сработало — добавьте вручную:
-- Группа: Дизайн-группа
-- Ссылка: https://panna.kaiten.ru/admin/users
+ℹ️ На второй рабочий день напомнить сотруднику создать карточку на правки рабочего времени (убрать опоздание + учесть время трудоустройства).
 ` : `
 Запрос на создание доступов для нового сотрудника:
 
@@ -118,18 +161,45 @@ Email: ${email}
 Требуется:
 - Доступ к интернету с соцсетями
 - Права на папки:
-  - \\\\gamma\\public\\images-design\\Illustrations (создание своей папки)
+  - \\\\gamma\\public\\images-design\\Illustrations (создание своей рабочей папки)
   - \\\\gamma.local\\public\\Vinogradovo\\Workspace\\Фото наборов (редактирование)
+  - \\\\gamma.local\\public\\Vinogradovo\\Workspace (редактирование)
+  - “Контент и бланк комментариев”, “Разработка товара” (редактирование)
   - G:\\Proizvodstvo\\ДИЗАЙН БЮРО (редактирование)
-  - G:\\Proизводство\\ПРОЕКТЫ\\CОТВОРЕЛЬ+СОТВОРЕЛКИ и др. проекты (в зависимости от направления)
+  - В зависимости от направления — папка проекта:
+    - G:\\Proizvodstvo\\ПРОЕКТЫ\\CОТВОРЕЛЬ+СОТВОРЕЛКИ
+    - G:\\Proizvodstvo\\ПРОЕКТЫ\\MIADOLLA
+    - G:\\Proizvodstvo\\ПРОЕКТЫ\\PANNA
+    - G:\\Proizvodstvo\\ПРОЕКТЫ\\ФРЕЯ
+    - G:\\Proizvodstvo\\ПРОЕКТЫ\\ОБЩАЯ ПАПКА (всех)
+- На чтение:
+  - \\\\fs-v-2.gamma.local\\images
+  - \\\\gamma.local\\public\\Images
+  - \\\\gamma.local\\public\\Vinogradovo\\Workspace\\TOOLS
+  - \\\\gamma.local\\public\\Vinogradovo\\Workspace\\РЕКЛАМНЫЕ МАКЕТЫ
+  - \\\\gamma.local\\public\\Vinogradovo\\Workspace\\ПЕРЕВОД
+  - \\\\gamma.local\\public\\Vinogradovo\\Workspace
+  - “Шаблоны полиграфии”
+  - \\\\gamma.local\\public\\Vinogradovo\\Workspace\\0_В ПЕЧАТЬ
+  - G:\\Proizvodstvo\\Общая
+  - \\\\gamma.local\\public\\Image_Bank\\
+
 - Роль в ТИС: Дизайнер ПАННА
 - Присвоить внутренний номер телефона в Спарке
-- Добавить в рассылки: art@panna.ru, db_managers@panna.ru, zamena@panna.ru, freya_crystal@panna.ru и др.
+- Пригласить в Kaiten и добавить в группу "Менеджеры, разработчики"
+- Добавить в рассылки:
+  - art@panna.ru — рассылка всего ДБ
+  - db_managers@panna.ru — рассылка менеджеров
+  - zamena@panna.ru — рассылка для поиска замены
+  - freya_crystal@panna.ru — кристальная мозаика
+  - freya_design@panna.ru — картины по номерам
+  - bumbel-art@panna.ru — бумбел
+  - embroidery@panna.ru — вышивка
+  - toys@miadolla.ru — миадолла
+- Дать заполнить заявление на ЗП
 
 ---
-⚠️ ВАЖНО: Если автоматическое добавление в группу не сработало — добавьте вручную:
-- Группа: Группа разработки
-- Ссылка: https://panna.kaiten.ru/admin/users
+ℹ️ На второй рабочий день напомнить сотруднику создать карточку на правки рабочего времени (убрать опоздание + учесть время трудоустройства).
 `;
 
     // Обязательно: board_id и column_id
@@ -195,8 +265,6 @@ Email: ${email}
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     console.log('Чек-лист успешно создан');
-
-    // 5. Отправка письма УДАЛЕНА по вашему запросу
 
     res.json({ success: true, message: `Сотрудник ${fullName} успешно добавлен!` });
     console.log('=== Обработка завершена успешно ===');
